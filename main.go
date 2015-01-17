@@ -5,6 +5,8 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/signal"
+	"syscall"
 )
 
 func forward(conn net.Conn) {
@@ -36,6 +38,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to setup tcp listener: %v", err)
 	}
+
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGHUP, syscall.SIGPIPE)
+	go func() {
+		for range c {
+		}
+	}()
 
 	for {
 		conn, err := listener.Accept()

@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -22,6 +23,8 @@ var (
 	verbose     bool
 	debug       bool
 )
+
+const none = "(none)"
 
 func main() {
 	parseFlags()
@@ -133,7 +136,7 @@ func refreshDns(connectTo string, dnsUpdates chan string) {
 	dnsClient := &dns.Client{}
 	name := dns.Fqdn(host)
 	qType := dns.StringToType["A"]
-	old := "(none)"
+	old := none
 
 	queryDns := func() {
 		req := &dns.Msg{}
@@ -164,14 +167,14 @@ func refreshDns(connectTo string, dnsUpdates chan string) {
 			if verbose {
 				log.Printf("DNS response has no A record: %+v\n", resp)
 			}
-		} else {
-			if old != to {
-				dnsUpdates <- to
-				if verbose {
-					log.Printf("Connect target changed `%s` -> `%s`\n", old, to)
-				}
-				old = to
+			to = none
+		}
+		if old != to {
+			dnsUpdates <- to
+			if verbose {
+				log.Printf("Connect target changed `%s` -> `%s`\n", old, to)
 			}
+			old = to
 		}
 	}
 
@@ -187,13 +190,13 @@ func refreshDns(connectTo string, dnsUpdates chan string) {
 }
 
 func manageTcp(resolver chan string, connections chan net.Conn) {
-	var connectTo string
+	connectTo := none
 	for {
 		select {
 		case connectTo = <-resolver:
 
 		case in := <-connections:
-			if connectTo != "" {
+			if connectTo != none {
 				go forwardTcp(in, connectTo)
 			} else {
 				if debug {
@@ -221,16 +224,16 @@ func forwardTcp(conn net.Conn, connectTo string) {
 	}
 	go func() {
 		defer close()
-		io.Copy(fwd, conn)
+		w, err := io.Copy(fwd, conn)
 		if debug {
-			log.Print("Incoming TCP connection closed\n")
+			log.Printf("Incoming TCP connection closed: %v; %v bytes forwarded\n", err, w)
 		}
 	}()
 	go func() {
 		defer close()
-		io.Copy(conn, fwd)
+		w, err := io.Copy(conn, fwd)
 		if debug {
-			log.Print("Outgoing TCP connection closed\n")
+			log.Printf("Outgoing TCP connection closed: %v; %v bytes forwarded\n", err, w)
 		}
 	}()
 }
@@ -243,22 +246,38 @@ func manageUdp(resolver chan string, connections chan net.Conn) {
 		case connectTo := <-resolver:
 			if out != nil {
 				(*out).Close()
+				out = nil
 			}
-			_out, err := net.Dial("udp", connectTo)
-			if err != nil {
-				log.Printf("Conection to `%s` failed: %v\n", connectTo, err)
-			} else {
-				out = &_out
-				if in != nil {
-					go io.Copy(*out, *in)
+			if connectTo != none {
+				_out, err := net.Dial("udp", connectTo)
+				if err != nil {
+					log.Printf("Conection to `%s` failed: %v\n", connectTo, err)
+				} else {
+					out = &_out
+					if in != nil {
+						go forwardUdp(in, out)
+					}
 				}
 			}
 
 		case _in := <-connections:
 			in = &_in
 			if out != nil {
-				go io.Copy(*out, *in)
+				go forwardUdp(in, out)
 			}
 		}
+	}
+}
+
+func forwardUdp(from *net.Conn, to *net.Conn) {
+	for {
+		w, err := io.Copy(*to, *from)
+		if debug {
+			log.Printf("UDP forwarding interrupted: %v; %v bytes forwarded\n", err, w)
+		}
+		if strings.Contains(err.Error(), "closed network connection") {
+			break
+		}
+		time.Sleep(1 * time.Second)
 	}
 }

@@ -13,7 +13,7 @@ Usage:
 
 Via Docker:
 
-    $ docker run --name proxy --restart unless-stopped \
+    $ docker run --name proxy --restart unless-stopped -d \
         -p 443:443/tcp arkadi/goproxy :443 10.10.20.55:4443
 
 Build Docker image:

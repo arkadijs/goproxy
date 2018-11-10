@@ -1,6 +1,6 @@
 ### TCP and UDP proxy in Go
 
-UDP proxying is unidirectional.
+UDP proxy is unidirectional.
 Usage:
 
     $ goproxy [flags] [listen-ip]:port [connect-to-ip]:port
@@ -10,5 +10,19 @@ Usage:
       -timeout=10s: TCP connect timeout
       -udp=false: UDP mode
       -verbose=false: Print noticeable info
+
+Via Docker:
+
+    $ docker run --name proxy --restart unless-stopped \
+        -p 443:443/tcp arkadi/goproxy :443 10.10.20.55:4443
+
+Build Docker image:
+
+    $ docker build . -t arkadi/goproxy
+
+Build static 64-bit Linux binary:
+
+    $ GOOS=linux GOARCH=amd64 CGO_ENABLED=0 \
+        go build -ldflags '-w -extldflags -static'
 
 Viva [go-nuts](https://groups.google.com/forum/#!topic/golang-nuts/zzW0GL4AP3k)!

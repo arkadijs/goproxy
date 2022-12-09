@@ -4,12 +4,21 @@ UDP proxy is unidirectional.
 Usage:
 
     $ goproxy [flags] [listen-ip]:port [connect-to-ip]:port
-      -debug=false: Print every connection information
-      -dns="": DNS server address, supply host:port; will use system default if not set
-      -dns-interval=20s: Time interval between DNS queries
-      -timeout=10s: TCP connect timeout
-      -udp=false: UDP mode
-      -verbose=false: Print noticeable info
+    Flags:
+    -debug
+            Print debug level info
+    -dns string
+            DNS server address, supply host[:port]; will use system default if not set
+    -dns-interval duration
+            Time interval between DNS queries (default 20s)
+    -srv
+            Query DNS for SRV records, -dns must be specified
+    -timeout duration
+            TCP connect timeout (default 10s)
+    -udp
+            UDP mode
+    -verbose
+            Print noticeable info
 
 Via Docker:
 
@@ -24,5 +33,7 @@ Build static 64-bit Linux binary:
 
     $ GOOS=linux GOARCH=amd64 CGO_ENABLED=0 \
         go build -ldflags '-w -extldflags -static'
+
+Note, for a multi-value SRV record the target pool could be unstable as DNS server may only return a subset of the target records (eight records on AWS).
 
 Viva [go-nuts](https://groups.google.com/forum/#!topic/golang-nuts/zzW0GL4AP3k)!
